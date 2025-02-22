@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ollama
+  ai:
+    vectorstore:
+      chroma:
+        initialize-schema: true
+        collection-name: fantasy_village
+    ollama:
+      init:
+        pull-model-strategy: always
+        timeout: 120s
+        max-retries: 3
+        embedding:
+          include: true
+      chat:
+        options:
+          model: llama3.2:3b
+          temperature: 0.7
+      embedding:
+        enabled: true
+        options:
+          model: mxbai-embed-large
+  http:
+    client:
+      factory: simple
