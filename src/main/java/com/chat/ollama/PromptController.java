@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,51 +42,27 @@ public class PromptController {
     @PostMapping
     String prompt(@RequestBody Request request) {
 
-//        List<Document> searchDocuments = vectorStore.similaritySearch(request.getQuery());
+        List<Document> searchDocuments = vectorStore.similaritySearch(request.getQuery());
 
-//        SystemPromptTemplate systemPromptTemplate
-//                = new SystemPromptTemplate("You are a knowledgeable assistant. " +
-//                "Use the provided context to answer the question accurately but don't mention the context in your reply. " +
-//                "Respond in plain text only. Do not use Markdown or HTML formatting: {context}");
+        SystemPromptTemplate systemPromptTemplate
+                = new SystemPromptTemplate("You are a knowledgeable assistant. " +
+                "Use the provided context to answer the question accurately but don't mention the context in your reply. " +
+                "Respond in plain text only. Do not use Markdown or HTML formatting: {context}");
 
-//        SystemPromptTemplate systemPromptTemplate
-//                = new SystemPromptTemplate("You are a helpful AI assistant that helps people find information. " +
-//                " Your name is Shardsight.");
-//
-//        Message systemMessage = systemPromptTemplate.createMessage();
+        Message systemMessage = systemPromptTemplate.createMessage(
+                Map.of("context",
+                        searchDocuments.stream().map(Document::getText).collect(Collectors.toList())));
 
-//        Message systemMessage = systemPromptTemplate.createMessage(
-//                Map.of("context",
-//                        searchDocuments.stream().map(Document::getText).collect(Collectors.toList())));
+        Message userMessage = new UserMessage(request.getQuery());
 
-//        Message userMessage = new UserMessage("What is your name?");
-////
-//        List<Message> messages = List.of(userMessage, systemMessage);
-//
-//        if (request.getOlderPrompts() != null) {
-//            messages.addAll(request.getOlderPrompts().stream()
-//                    .map(prompt -> new AssistantMessage(prompt.getResponse())).toList());
-//        }
+        List<Message> messages = new ArrayList<>(List.of(userMessage, systemMessage));
 
-//        Prompt prompt = new Prompt(messages);
+        if (request.getOlderPrompts() != null) {
+            messages.addAll(request.getOlderPrompts().stream()
+                    .map(prompt -> new AssistantMessage(prompt.getResponse())).toList());
+        }
 
-        String userText = """
-    Tell me about three famous pirates from the Golden Age of Piracy and why they did.
-    Write at least a sentence for each pirate.
-    """;
-
-        Message userMessage = new UserMessage(userText);
-
-        String systemText = """
-  You are a helpful AI assistant that helps people find information.
-  Your name is {name}
-  You should reply to the user's request with your name and also in the style of a {voice}.
-  """;
-
-        SystemPromptTemplate systemPromptTemplate = new SystemPromptTemplate(systemText);
-        Message systemMessage = systemPromptTemplate.createMessage(Map.of("name", "vivek", "voice", "jack sparrow"));
-
-        Prompt prompt = new Prompt(List.of(userMessage, systemMessage));
+        Prompt prompt = new Prompt(messages);
 
         ChatResponse response = chatModel.call(prompt);
 
