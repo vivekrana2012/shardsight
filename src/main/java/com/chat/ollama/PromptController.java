@@ -51,16 +51,20 @@ public class PromptController {
 
         Message systemMessage = systemPromptTemplate.createMessage(
                 Map.of("context",
-                        searchDocuments.stream().map(Document::getText).collect(Collectors.toList())));
+                        searchDocuments.stream().map(Document::getText).collect(Collectors.joining("\n"))));
 
         Message userMessage = new UserMessage(request.getQuery());
 
-        List<Message> messages = new ArrayList<>(List.of(userMessage, systemMessage));
+        List<Message> messages = new ArrayList<>();
+
+        messages.add(systemMessage);
 
         if (request.getOlderPrompts() != null) {
             messages.addAll(request.getOlderPrompts().stream()
                     .map(prompt -> new AssistantMessage(prompt.getResponse())).toList());
         }
+
+        messages.add(userMessage);
 
         Prompt prompt = new Prompt(messages);
 
