@@ -1,5 +1,6 @@
 package com.chat.ollama;
 
+import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -18,8 +19,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RequestMapping("/api/v1/prompt")
@@ -30,6 +33,10 @@ public class PromptController {
     private final VectorStore vectorStore;
     private final ChatModel chatModel;
     private final Configuration configuration;
+
+    private static final Set<String> STOP_WORDS = Arrays.stream(EnglishAnalyzer.getDefaultStopSet().toArray())
+            .map(Object::toString)
+            .collect(Collectors.toSet());
 
     public PromptController(TokenTextSplitter tokenTextSplitter, VectorStore vectorStore,
                             ChatModel chatModel, Configuration configuration) {
@@ -42,7 +49,12 @@ public class PromptController {
     @PostMapping
     String prompt(@RequestBody Request request) {
 
-        List<Document> searchDocuments = vectorStore.similaritySearch(request.getQuery());
+        String cleanQuery = Arrays.stream(request.getQuery().split("\\s+"))  // Split by spaces
+                .map(String::toLowerCase)         // Convert to lowercase
+                .filter(word -> !STOP_WORDS.contains(word))  // Remove stopwords
+                .collect(Collectors.joining(" "));
+
+        List<Document> searchDocuments = vectorStore.similaritySearch(cleanQuery);
 
         SystemPromptTemplate systemPromptTemplate
                 = new SystemPromptTemplate("You are a knowledgeable assistant. " +

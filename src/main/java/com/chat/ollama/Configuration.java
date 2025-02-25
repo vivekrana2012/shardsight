@@ -14,6 +14,6 @@ public class Configuration {
 
     @Bean
     TokenTextSplitter tokenTextSplitter() {
-        return new TokenTextSplitter(100, 10, 5, 10000, Boolean.TRUE);
+        return new TokenTextSplitter(60, 10, 5, 10000, Boolean.TRUE);
     }
 }

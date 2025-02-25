@@ -12,6 +12,7 @@
 	<artifactId>ollama</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ollama</name>
+
 	<description>Hello world for spring ai</description>
 
 	<properties>
@@ -62,6 +63,11 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-ollama-spring-boot-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-analysis-common</artifactId>
+			<version>10.1.0</version>
 		</dependency>
 
 		<dependency>
