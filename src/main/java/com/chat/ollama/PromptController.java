@@ -1,14 +1,7 @@
 package com.chat.ollama;
 
-import org.apache.lucene.analysis.en.EnglishAnalyzer;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -18,74 +11,45 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
+@Slf4j
 @RequestMapping("/api/v1/prompt")
 @RestController
 public class PromptController {
 
     private final TokenTextSplitter tokenTextSplitter;
     private final VectorStore vectorStore;
-    private final ChatModel chatModel;
     private final Configuration configuration;
-
-    private static final Set<String> STOP_WORDS = Arrays.stream(EnglishAnalyzer.getDefaultStopSet().toArray())
-            .map(Object::toString)
-            .collect(Collectors.toSet());
+    private final DocumentRetriever documentRetriever;
+    private final MessageCreator messageCreator;
+    private final ModelPrompter modelPrompter;
 
     public PromptController(TokenTextSplitter tokenTextSplitter, VectorStore vectorStore,
-                            ChatModel chatModel, Configuration configuration) {
+                            Configuration configuration, DocumentRetriever documentRetriever,
+                            MessageCreator messageCreator, ModelPrompter modelPrompter) {
         this.tokenTextSplitter = tokenTextSplitter;
         this.vectorStore = vectorStore;
-        this.chatModel = chatModel;
         this.configuration = configuration;
+        this.documentRetriever = documentRetriever;
+        this.messageCreator = messageCreator;
+        this.modelPrompter = modelPrompter;
     }
 
     @PostMapping
     String prompt(@RequestBody Request request) {
 
-        String cleanQuery = Arrays.stream(request.getQuery().split("\\s+"))  // Split by spaces
-                .map(String::toLowerCase)         // Convert to lowercase
-                .filter(word -> !STOP_WORDS.contains(word))  // Remove stopwords
-                .collect(Collectors.joining(" "));
+        log.info(STR."Got Request :: \{request.getQuery()}");
 
-        List<Document> searchDocuments = vectorStore.similaritySearch(cleanQuery);
+        // we need to search within our vector store to find query relevant information
+        List<Document> retrievedDocuments = documentRetriever.retrieve(request.getQuery());
 
-        SystemPromptTemplate systemPromptTemplate
-                = new SystemPromptTemplate("You are a knowledgeable assistant. " +
-                "Use the provided context to answer the question accurately but don't mention the context in your reply. " +
-                "Respond in plain text only. Do not use Markdown or HTML formatting: {context}");
+        // based on the user query, retrievedDocuments from vector store and
+        // the historic conversation we need to create messages for the model
+        List<Message> messages = messageCreator.create(request, retrievedDocuments);
 
-        Message systemMessage = systemPromptTemplate.createMessage(
-                Map.of("context",
-                        searchDocuments.stream().map(Document::getText).collect(Collectors.joining("\n"))));
-
-        Message userMessage = new UserMessage(request.getQuery());
-
-        List<Message> messages = new ArrayList<>();
-
-        messages.add(systemMessage);
-
-        if (request.getOlderPrompts() != null) {
-            messages.addAll(request.getOlderPrompts().stream()
-                    .map(prompt -> new AssistantMessage(prompt.getResponse())).toList());
-        }
-
-        messages.add(userMessage);
-
-        Prompt prompt = new Prompt(messages);
-
-        ChatResponse response = chatModel.call(prompt);
-
-        return response.getResults().stream()
-                .map(Generation::getOutput)
-                .map(AssistantMessage::getText)
-                .collect(Collectors.joining());
+        // now we prompt the model and get the response
+        return modelPrompter.prompt(messages);
     }
 
     @PostMapping("/init")
@@ -96,7 +60,7 @@ public class PromptController {
 
         List<Document> splitDocuments = tokenTextSplitter.apply(documents);
 
-        System.out.println("Total Splits - " + splitDocuments.size());
+        System.out.println(STR."Total Splits - \{splitDocuments.size()}");
 
         vectorStore.add(splitDocuments);
 

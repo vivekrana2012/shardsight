@@ -24,3 +24,7 @@ spring:
   http:
     client:
       factory: simple
+
+logging:
+  level:
+    com.chat.ollama: DEBUG
